@@ -10,40 +10,57 @@ import datetime, calendar
 import multiprocessing
 import concurrent.futures
 import sys
+import requests
+import json
 
 
 
 pd.options.display.float_format = '{:.0f}'.format
 
-class EarningsScraper:
-    def __init__(self, month):
-        self.month = datetime.datetime.strptime(month, '%B %Y')
-        self.days = self.getMonth(self.month)
+class EarningsScraper(object):
+    
+    def __init__(self):
+        
         self.offset = 0
         self.offset_step=100
         self.url = 'https://finance.yahoo.com/calendar/earnings'
-        self.EarningsMonth = self.getEarningsMonth(self.days)
+      
+
+    def checkDate(self, date):
         
+        format = "%Y-%m-%d"
 
+        try:
+            datetime.datetime.strptime(date, format)
+        except ValueError:
+            print("Incorrect date string format. Should be YYYY-MM-DD.")
+            raise
 
-
-    def formatDate(self, date):
+    def checkMonth(self, month):
         
-        return datetime.datetime.strptime(date, '%b %d %Y %I:%M%p')
+        format = '%B %Y'
 
+        try:
+            datetime.datetime.strptime(month, format)
+        except ValueError:
+            print("Incorrect month string format. Should be Month-YYYY.")
+            raise
+
+        
     def formatUrl(self, date):
 
-        self.date = date.strftime('%Y-%m-%d')
-        date_url = '{0}?day={1}&offset={2}&size{3}'.format(self.url, self.date, self.offset, self.offset_step)
+        date_url = '{0}?day={1}&offset={2}&size{3}'.format(self.url, date, self.offset, self.offset_step)
         print("dated_url", date_url)
         return date_url
 
     def getEarnings(self, date):
-
-        self.thisDateUrl = self.formatUrl(date)
+        
+        self.checkDate(date)
+        thisDateUrl = self.formatUrl(date)
+        
 
         driver = webdriver.Chrome(ChromeDriverManager().install())
-        driver.get(self.thisDateUrl)
+        driver.get(thisDateUrl)
         html = driver.execute_script('return document.body.innerHTML;')
         soup = BeautifulSoup(html, 'lxml')
         driver.close()
@@ -71,36 +88,32 @@ class EarningsScraper:
 
         for t,u,v,w,x,y in zip(co_ticker, co_name, co_callTime, co_EpsEst, co_repEps, co_surprisePct):
             print("going through", t,u,v,w,x,y)
-            EarningsList.append(Earnings(t,u,v,w,x,y))
-
+            EarningsList.append(Earnings(t,u,v,w,x,y,date))
         print(len(EarningsList))
-        self.printEarnings(EarningsList)
-        return [date, EarningsList]
-
-    def printEarnings(self, earningsList):
-
-        for x in earningsList:
-            print(x.name)
+        
+        return [(x.js)for x in EarningsList] 
 
     def getMonth(self, mon):
+        
+        mon = datetime.datetime.strptime(mon, '%B %Y')
+        
         year = mon.year
 
         month = mon.month
 
         num_days = calendar.monthrange(year, month)[1]
 
-        days = [datetime.date(year, month, day).strftime('%b %d %Y %I:%M%p')for day in range(1, num_days+1)]
-
-        return [datetime.datetime.strptime(x, '%b %d %Y %I:%M%p')for x in days]
+        
+        return [datetime.datetime(year, month, x, 0, 0).strftime('%Y-%m-%d')for x in range(1, num_days+1)]
 
     
-    def getEarningsMonth(self, days):
+    def getEarningsMonth(self, monthYear):
 
-        old_stdout = sys.stdout
-        log_file = open("message.log", "w")
-        sys.stdout = log_file
-        print("this will start the log:")
-        print(str(days))
+
+        self.checkMonth(monthYear)
+
+        days = self.getMonth(monthYear)
+        
 
         try:
             with concurrent.futures.ProcessPoolExecutor() as executor:
@@ -110,13 +123,12 @@ class EarningsScraper:
 
                 concurrent.futures.wait(results, timeout = None, return_when=concurrent.futures.ALL_COMPLETED)
 
-                return results
+                return [(x.result()) for x in results]
 
         except Exception as e:
             print(e)
 
-        sys.stdout = old_stdout
-        log_file.close()
+        
 
 
         
@@ -127,40 +139,35 @@ class EarningsScraper:
 
 class Earnings:
 
-    def __init__(self, ticker, name, callTime, epsEst, repEps, surprisePct):
+    def __init__(self, ticker, name, callTime, epsEst, repEps, surprisePct, date):
+        self.date = date
         self.ticker = ticker
         self.name = name
         self.callTime = callTime
         self.epsEst = epsEst
         self.repEps = repEps
         self.surprisePct = surprisePct
+        self.id=id
+        self.js = {
 
-    # def ticker(self):
-    #     return self.ticker
+            'date': self.date,
+            'ticker': self.ticker,
+            'corp': self.name,
+            'callTime': self.callTime,
+            'epsEst': self.epsEst,
+            'repEps': self.repEps,
+            'surPct': self.surprisePct
 
-    # def name(self):
+        }
 
-    #     return self.name
-
-    # def callTime(self):
-    #     return self.callTime
-
-    # def epsEst(self):
-    #     return self.epsEst
-
-    # def repEps(self):
-    #     return self.repEps
-
-    # def surprisePct(self):
-    #     return self.surprisePct
+    
 
 if __name__ == '__main__':    
-    # extractor = parallelTestModule.ParallelExtractor()
-    # extractor.runInParallel(numProcesses=2, numThreads=4)
-    test = EarningsScraper('September 2021')
-
-    for x in test.EarningsMonth:
-        print(str(x))
+    
+    test = EarningsScraper()
+    print(test.getEarnings('2021-09-21'))
+    print(test.getEarningsMonth('September 2021'))
+    
 
 
 
