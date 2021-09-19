@@ -4,7 +4,6 @@ import re
 from selenium import webdriver
 import chromedriver_binary
 import string
-import numpy as np
 from webdriver_manager.chrome import ChromeDriverManager
 import datetime, calendar
 import multiprocessing
