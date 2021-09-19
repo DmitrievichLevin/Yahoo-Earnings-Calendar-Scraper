@@ -1,1 +1,1 @@
-from .EarningsScraper import EarningsScraper
+from .earningsCalendarScraper import EarningsScraper
